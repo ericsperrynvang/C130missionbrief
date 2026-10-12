@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101923">
+<title>C-130 Mission Briefing</title>
+
+<link rel="stylesheet"
+ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+:root {
+  --bg:#101923;
+  --panel:#1b2936;
+  --panel2:#243747;
+  --text:#eef4f8;
+  --muted:#aab9c6;
+  --accent:#65c8ff;
+  --border:#3b5061;
+  --danger:#ff9a91;
+  --good:#a5e6bd;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  line-height:1.45;
+}
+header {
+  padding:18px 16px;
+  background:#152330;
+  border-bottom:1px solid var(--border);
+}
+header h1 { margin:0 0 5px; font-size:1.4rem; }
+header p { margin:0; color:var(--muted); font-size:.9rem; }
+main { max-width:1100px; margin:auto; padding:14px; }
+section {
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:15px;
+  margin-bottom:14px;
+}
+h2 { font-size:1.12rem; margin:0 0 12px; }
+h3 { font-size:1rem; margin:12px 0 8px; }
+label {
+  display:block;
+  font-size:.85rem;
+  color:var(--muted);
+  margin-bottom:5px;
+}
+input,select,textarea,button {
+  font:inherit;
+  border-radius:8px;
+}
+input,select,textarea {
+  width:100%;
+  min-height:43px;
+  color:var(--text);
+  background:#101923;
+  border:1px solid var(--border);
+  padding:9px 10px;
+}
+textarea { min-height:85px; resize:vertical; }
+button {
+  min-height:42px;
+  padding:9px 13px;
+  color:var(--text);
+  background:var(--panel2);
+  border:1px solid var(--border);
+  cursor:pointer;
+}
+button.primary {
+  background:#13577b;
+  border-color:#2583b0;
+}
+button.danger { color:#ffd2cd; }
+button:active { opacity:.8; }
+.grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.field { min-width:0; }
+.full { grid-column:1/-1; }
+.row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+.row > * { flex:1; min-width:100px; }
+.muted { color:var(--muted); font-size:.88rem; }
+.status { margin-top:9px; color:var(--muted); font-size:.9rem; }
+.result,.waypoint,.timeline-item {
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:11px;
+  margin-top:9px;
+  overflow-wrap:anywhere;
+}
+.result strong,.waypoint strong { display:block; }
+.result small { color:var(--muted); display:block; margin:4px 0 8px; }
+.result button { width:100%; }
+.waypoint .row { margin-top:8px; }
+#map { height:360px; border-radius:10px; background:#263746; }
+#radarMap { height:280px; border-radius:10px; }
+.metric {
+  background:#101923;
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:12px;
+}
+.metric strong { display:block; font-size:1.2rem; }
+.metric span { color:var(--muted); font-size:.85rem; }
+.notice {
+  border-left:3px solid var(--accent);
+  padding:9px 12px;
+  background:#132532;
+  color:#dbeaf4;
+  font-size:.88rem;
+}
+.error { color:var(--danger); }
+.good { color:var(--good); }
+footer {
+  padding:15px;
+  color:var(--muted);
+  text-align:center;
+  font-size:.8rem;
+}
+hr { border:0; border-top:1px solid var(--border); margin:14px 0; }
+@media(max-width:620px) {
+  main { padding:9px; }
+  section { padding:12px; }
+  .grid { grid-template-columns:1fr; }
+  .full { grid-column:auto; }
+  #map { height:310px; }
+  button { min-height:44px; }
+}
+@media print {
+  body { background:white; color:black; }
+  header,section { background:white; color:black; border:1px solid #aaa; }
+  button,.no-print,#map,#radarMap { display:none!important; }
+  input,textarea,select { color:black; background:white; border:1px solid #aaa; }
+}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>C-130 Mission Briefing</h1>
+  <p>Mission planning workspace · Aviation data and weather tools</p>
+</header>
+
+<main>
+
+<section>
+  <h2>1. Mission Overview</h2>
+  <div class="grid">
+    <div class="field">
+      <label for="missionName">Mission name</label>
+      <input id="missionName" placeholder="Training sortie">
+    </div>
+    <div class="field">
+      <label for="missionDate">Mission date</label>
+      <input id="missionDate" type="date">
+    </div>
+    <div class="field">
+      <label for="callsign">Callsign</label>
+      <input id="callsign" placeholder="Callsign">
+    </div>
+    <div class="field">
+      <label for="aircraft">Aircraft</label>
+      <select id="aircraft">
+        <option>C-130H</option>
+        <option>C-130J</option>
+        <option>Other / custom</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="departure">Departure</label>
+      <input id="departure" placeholder="Airport identifier">
+    </div>
+    <div class="field">
+      <label for="destination">Destination</label>
+      <input id="destination" placeholder="Airport identifier">
+    </div>
+    <div class="field">
+      <label for="crew">Crew</label>
+      <input id="crew" placeholder="Crew names / positions">
+    </div>
+    <div class="field">
+      <label for="planningSpeed">Planning speed (kt)</label>
+      <input id="planningSpeed" type="number" min="1" value="250">
+    </div>
+    <div class="field full">
+      <label for="missionNotes">Mission notes</label>
+      <textarea id="missionNotes" placeholder="Objectives, coordination, special considerations"></textarea>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>2. Aviation Waypoint Search</h2>
+  <div class="notice">
+    Aviation-only search. General geographic place search is disabled.
+    Verify all identifiers and coordinates against current approved aeronautical
+    publications before operational use.
+  </div>
+  <br>
+
+  <div class="grid">
+    <div class="field">
+      <label for="wpType">Search category</label>
+      <select id="wpType">
+        <option value="airport">Airport</option>
+        <option value="fix">Fix / waypoint</option>
+        <option value="navaid">Navigation aid</option>
+        <option value="all">All aviation categories</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="wpSearch">Aviation identifier</label>
+      <input id="wpSearch" placeholder="e.g. KLAS or a published fix"
+        autocomplete="off">
+    </div>
+    <div class="field full row no-print">
+      <button class="primary" id="searchButton">Search aviation data</button>
+      <button id="clearSearch">Clear results</button>
+    </div>
+  </div>
+
+  <div id="searchStatus" class="status" aria-live="polite"></div>
+  <div id="searchResults"></div>
+
+  <hr>
+
+  <h3>Manual coordinate entry</h3>
+  <p class="muted">
+    Use this only when you have independently verified the coordinates.
+    Manual entries are clearly marked as user supplied.
+  </p>
+  <div class="grid">
+    <div class="field">
+      <label for="manualId">Identifier / label</label>
+      <input id="manualId" placeholder="Waypoint label">
+    </div>
+    <div class="field">
+      <label for="manualLat">Latitude (decimal degrees)</label>
+      <input id="manualLat" type="number" step="any" placeholder="36.0800">
+    </div>
+    <div class="field">
+      <label for="manualLon">Longitude (decimal degrees)</label>
+      <input id="manualLon" type="number" step="any" placeholder="-115.1522">
+    </div>
+    <div class="field">
+      <label for="manualName">Description</label>
+      <input id="manualName" placeholder="Optional description">
+    </div>
+    <div class="field full">
+      <button class="primary" id="addManual">Add manual waypoint</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. Route and Map</h2>
+  <div id="map"></div>
+  <div class="grid" style="margin-top:12px">
+    <div class="metric">
+      <strong id="routeDistance">0 NM</strong>
+      <span>Estimated straight-line route distance</span>
+    </div>
+    <div class="metric">
+      <strong id="routeTime">0 min</strong>
+      <span>Estimated en-route time at planning speed</span>
+    </div>
+  </div>
+  <p class="muted">
+    Straight-line estimates only. These are not approved navigation,
+    fuel, performance, or flight-planning calculations.
+  </p>
+  <div id="routeList"></div>
+  <div class="row no-print" style="margin-top:12px">
+    <button id="clearRoute" class="danger">Clear route</button>
+    <button id="fitRoute">Fit route on map</button>
+  </div>
+</section>
+
+<section>
+  <h2>4. Aviation Weather</h2>
+  <div class="grid">
+    <div class="field">
+      <label for="weatherStation">Station identifier</label>
+      <input id="weatherStation" placeholder="e.g. KLAS">
+    </div>
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="getWeather" class="primary">Get METAR / TAF</button>
+    </div>
+  </div>
+  <div id="weatherStatus" class="status" aria-live="polite"></div>
+  <h3>METAR</h3>
+  <pre id="metarOutput" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+  <h3>TAF</h3>
+  <pre id="tafOutput" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+
+  <hr>
+  <h3>PIREP / SIGMET / AIRMET</h3>
+  <p class="muted">
+    These products are queried from the Aviation Weather Center. Availability
+    and geographic coverage depend on the service response. Review the official
+    products for complete, current information.
+  </p>
+  <div class="row no-print">
+    <button id="getPIREPs">Load PIREPs</button>
+    <button id="getSIGMETs">Load SIGMETs</button>
+    <button id="getGairmets">Load G-AIRMETs</button>
+  </div>
+  <div id="areaWeatherStatus" class="status"></div>
+  <div id="areaWeatherResults"></div>
+</section>
+
+<section>
+  <h2>5. Weather Radar</h2>
+  <p class="muted">
+    Radar availability depends on the third-party service. Radar imagery may
+    be delayed or unavailable. Use official weather sources for operational
+    decisions.
+  </p>
+  <div id="radarMap"></div>
+  <div class="row no-print" style="margin-top:10px">
+    <button id="loadRadar" class="primary">Refresh radar</button>
+    <button id="toggleRadar">Toggle radar overlay</button>
+  </div>
+  <div id="radarStatus" class="status"></div>
+</section>
+
+<section>
+  <h2>6. Mission Timeline</h2>
+  <div class="grid">
+    <div class="field">
+      <label for="timelineTime">Time</label>
+      <input id="timelineTime" type="time">
+    </div>
+    <div class="field">
+      <label for="timelineEvent">Event</label>
+      <input id="timelineEvent" placeholder="Briefing, step, departure">
+    </div>
+    <div class="field full">
+      <button id="addTimeline" class="primary">Add timeline event</button>
+    </div>
+  </div>
+  <div id="timelineList"></div>
+</section>
+
+<section>
+  <h2>7. Communications / Coordination</h2>
+  <div class="grid">
+    <div class="field">
+      <label for="commName">Agency / station</label>
+      <input id="commName" placeholder="Agency or station">
+    </div>
+    <div class="field">
+      <label for="commFreq">Frequency / channel</label>
+      <input id="commFreq" placeholder="Enter verified frequency">
+    </div>
+    <div class="field full">
+      <label for="commNotes">Notes</label>
+      <textarea id="commNotes" placeholder="Coordination notes"></textarea>
+    </div>
+    <div class="field full">
+      <button id="addComm" class="primary">Add communications entry</button>
+    </div>
+  </div>
+  <div id="commList"></div>
+</section>
+
+<section>
+  <h2>8. Save, Export, and Brief</h2>
+  <div class="row no-print">
+    <button id="saveMission" class="primary">Save mission</button>
+    <button id="exportMission">Export JSON</button>
+    <button id="importButton">Import JSON</button>
+    <input id="importFile" type="file" accept=".json,application/json"
+      hidden>
+    <button id="previewBrief">Briefing preview</button>
+    <button id="printBrief">Print briefing</button>
+  </div>
+  <div id="saveStatus" class="status"></div>
+  <div id="briefPreview" style="margin-top:12px"></div>
+</section>
+
+<section>
+  <h2>Data and Safety Notice</h2>
+  <p class="muted">
+    This application is a planning aid, not an approved flight-planning
+    system. It does not replace current FAA publications, NOTAMs, official
+    weather briefings, certified navigation databases, aircraft manuals,
+    performance calculations, checklists, or command approval. Confirm all
+    data independently before use. Do not rely on this application for
+    aircraft navigation or operational decisions.
+  </p>
+</section>
+
+</main>
+
+<footer>
+  C-130 Mission Briefing · Verify all data using current official sources.
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+"use strict";
+
+/*
+ * Aviation lookup:
+ * This application queries the Aviation Weather Center's documented data API.
+ * If an endpoint rejects the request or returns an unsupported response, the
+ * app reports that failure. It never falls back to a general place search.
+ *
+ * This is not a locally installed FAA NASR database. For authoritative,
+ * comprehensive US fix/NAVAID coverage, integrate a maintained NASR dataset
+ * through a backend or other verified data service.
+ */
+
+const API = "https://aviationweather.gov/api/data";
+const STORAGE_KEY = "c130missionbrief_v2";
+
+const $ = id => document.getElementById(id);
+
+const state = {
+  waypoints: [],
+  timeline: [],
+  comms: [],
+  weatherReports: [],
+  radarLayer: null,
+  radarEnabled: true
+};
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  })[ch]);
+}
+
+function say(id, message, className = "") {
+  const element = $(id);
+  element.textContent = message;
+  element.className = "status " + className;
+}
+
+async function getJson(url) {
+  const response = await fetch(url, {
+    headers: { "Accept": "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error("HTTP " + response.status);
+  }
+  return response.json();
+}
+
+function listOf(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.features)) return data.features;
+  if (data && Array.isArray(data.data)) return data.data;
+  if (data && Array.isArray(data.results)) return data.results;
+  if (data && typeof data === "object") return [data];
+  return [];
+}
+
+function getField(item, names) {
+  for (const name of names) {
+    if (item && item[name] !== undefined && item[name] !== null &&
+        item[name] !== "") return item[name];
+    if (item && item.properties &&
+        item.properties[name] !== undefined &&
+        item.properties[name] !== null &&
+        item.properties[name] !== "") {
+      return item.properties[name];
+    }
+  }
+  return "";
+}
+
+function normalizeNav(item, label) {
+  const props = item && item.properties ? item.properties : item;
+  let lat = Number(getField(props, [
+    "lat","latitude","LAT","LATITUDE"
+  ]));
+  let lon = Number(getField(props, [
+    "lon","longitude","LON","LONGITUDE","long"
+  ]));
+
+  if (item && item.geometry && Array.isArray(item.geometry.coordinates)) {
+    lon = Number(item.geometry.coordinates[0]);
+    lat = Number(item.geometry.coordinates[1]);
+  }
+
+  const id = getField(props, [
+    "id","ident","identifier","icaoId","site","station_id",
+    "fix_id","nav_id","faa_id","ARPT_ID","FIX_ID","NAV_ID"
+  ]);
+
+  const name = getField(props, [
+    "name","facility","facility_name","ARPT_NAME",
+    "NAV_NAME","FIX_ID","description","airport_name"
+  ]);
+
+  return {
+    id: String(id || "").trim().toUpperCase(),
+    name: String(name || id || "Unnamed aviation record").trim(),
+    type: label,
+    lat,
+    lon,
+    source: "Aviation Weather Center"
+  };
+}
+
+function validCoordinates(w) {
+  return Number.isFinite(w.lat) &&
+    Number.isFinite(w.lon) &&
+    w.lat >= -90 && w.lat <= 90 &&
+    w.lon >= -180 && w.lon <= 180;
+}
+
+function matchesIdentifier(w, query) {
+  // Intentionally strict: no fuzzy match to unrelated names or locations.
+  return w.id === query ||
+    w.name.trim().toUpperCase() === query;
+}
+
+async function searchWaypoint() {
+  const query = $("wpSearch").value.trim().toUpperCase();
+  if (!query) {
+    say("searchStatus", "Enter an aviation identifier.");
+    return;
+  }
+
+  const category = $("wpType").value;
+  const sources = [
+    { endpoint:"airport", label:"Airport" },
+    { endpoint:"fix", label:"Fix / waypoint" },
+    { endpoint:"navaid", label:"Navaid" }
+  ].filter(s => category === "all" || s.endpoint === category);
+
+  $("searchResults").replaceChildren();
+  say("searchStatus", "Searching aviation data sources…");
+
+  const found = [];
+  const seen = new Set();
+  const errors = [];
+
+  for (const source of sources) {
+    try {
+      const url = `${API}/${source.endpoint}?ids=${encodeURIComponent(query)}&format=json`;
+      const data = await getJson(url);
+
+      for (const item of listOf(data)) {
+        const w = normalizeNav(item, source.label);
+        if (!validCoordinates(w)) continue;
+        if (!w.id || !matchesIdentifier(w, query)) continue;
+
+        const key = [
+          w.type, w.id, w.lat.toFixed(5), w.lon.toFixed(5)
+        ].join("|");
+
+        if (seen.has(key)) continue;
+        seen.add(key);
+        found.push(w);
+      }
+    } catch (error) {
+      errors.push(source.label + ": " + error.message);
+      console.warn("Aviation lookup failed:", source.endpoint, error);
+    }
+  }
+
+  if (found.length) {
+    displaySearchResults(found);
+    say(
+      "searchStatus",
+      `Found ${found.length} exact aviation match(es). Verify each result before adding it.`,
+      "good"
+    );
+  } else if (errors.length) {
+    say(
+      "searchStatus",
+      "No verified match returned. One or more aviation lookups failed. The app did not search ordinary geographic places. You can enter independently verified coordinates manually."
+    );
+  } else {
+    say(
+      "searchStatus",
+      "No exact aviation identifier match found. Check the identifier, select another category, or enter independently verified coordinates manually."
+    );
+  }
+}
+
+function displaySearchResults(results) {
+  const container = $("searchResults");
+  container.replaceChildren();
+
+  results.forEach((w, index) => {
+    const div = document.createElement("div");
+    div.className = "result";
+    div.innerHTML = `
+      <strong>${escapeHTML(w.id)} — ${escapeHTML(w.name)}</strong>
+      <small>
+        Type: ${escapeHTML(w.type)}<br>
+        Coordinates: ${w.lat.toFixed(5)}, ${w.lon.toFixed(5)}<br>
+        Source: ${escapeHTML(w.source)}
+      </small>
+      <button type="button" class="primary">Add to route</button>
+    `;
+    div.querySelector("button").addEventListener("click", () => {
+      addWaypoint(w);
+    });
+    container.appendChild(div);
+  });
+}
+
+$("searchButton").addEventListener("click", searchWaypoint);
+$("wpSearch").addEventListener("keydown", e => {
+  if (e.key === "Enter") searchWaypoint();
+});
+$("clearSearch").addEventListener("click", () => {
+  $("searchResults").replaceChildren();
+  $("wpSearch").value = "";
+  say("searchStatus", "Search results cleared.");
+});
+
+function addWaypoint(w) {
+  if (!validCoordinates(w)) {
+    alert("This waypoint does not have valid coordinates.");
+    return;
+  }
+
+  const wp = {
+    id: String(w.id || "MANUAL").toUpperCase(),
+    name: String(w.name || w.id || "Waypoint"),
+    type: String(w.type || "Manual"),
+    lat: Number(w.lat),
+    lon: Number(w.lon),
+    source: String(w.source || "User supplied")
+  };
+
+  state.waypoints.push(wp);
+  renderRoute();
+  saveLocal();
+  say("saveStatus", "Waypoint added to route.");
+}
+
+$("addManual").addEventListener("click", () => {
+  const id = $("manualId").value.trim();
+  const name = $("manualName").value.trim();
+  const lat = Number($("manualLat").value);
+  const lon = Number($("manualLon").value);
+
+  if (!id) {
+    alert("Enter a waypoint label or identifier.");
+    return;
+  }
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+      !Number.isFinite(lon) || lon < -180 || lon > 180) {
+    alert("Enter valid decimal latitude and longitude.");
+    return;
+  }
+
+  addWaypoint({
+    id,
+    name: name || id,
+    type: "Manual coordinate",
+    lat,
+    lon,
+    source: "User supplied — verify independently"
+  });
+
+  $("manualId").value = "";
+  $("manualName").value = "";
+});
+
+function haversineNM(a, b) {
+  const rad = d => d * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLon = rad(b.lon - a.lon);
+  const lat1 = rad(a.lat);
+  const lat2 = rad(b.lat);
+
+  const h = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(dLon / 2) ** 2;
+
+  return 3440.065 * 2 * Math.atan2(
+    Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h))
+  );
+}
+
+function routeDistanceNM() {
+  let total = 0;
+  for (let i = 1; i < state.waypoints.length; i++) {
+    total += haversineNM(
+      state.waypoints[i - 1],
+      state.waypoints[i]
+    );
+  }
+  return total;
+}
+
+function renderRoute() {
+  const container = $("routeList");
+  container.replaceChildren();
+
+  state.waypoints.forEach((w, index) => {
+    const div = document.createElement("div");
+    div.className = "waypoint";
+    div.innerHTML = `
+      <strong>${index + 1}. ${escapeHTML(w.id)} — ${escapeHTML(w.name)}</strong>
+      <div class="muted">
+        ${escapeHTML(w.type)} · ${w.lat.toFixed(5)}, ${w.lon.toFixed(5)}
+      </div>
+      <div class="muted">Source: ${escapeHTML(w.source)}</div>
+      <div class="row no-print">
+        <button data-action="up">Move up</button>
+        <button data-action="down">Move down</button>
+        <button data-action="delete" class="danger">Remove</button>
+      </div>
+    `;
+
+    div.querySelector('[data-action="up"]').addEventListener("click", () => {
+      if (index > 0) {
+        [state.waypoints[index - 1], state.waypoints[index]] =
+          [state.waypoints[index], state.waypoints[index - 1]];
+        renderRoute();
+        saveLocal();
+      }
+    });
+
+    div.querySelector('[data-action="down"]').addEventListener("click", () => {
+      if (index < state.waypoints.length - 1) {
+        [state.waypoints[index + 1], state.waypoints[index]] =
+          [state.waypoints[index], state.waypoints[index + 1]];
+        renderRoute();
+        saveLocal();
+      }
+    });
+
+    div.querySelector('[data-action="delete"]').addEventListener("click", () => {
+      state.waypoints.splice(index, 1);
+      renderRoute();
+      saveLocal();
+    });
+
+    container.appendChild(div);
+  });
+
+  const distance = routeDistanceNM();
+  const speed = Number($("planningSpeed").value);
+  $("routeDistance").textContent = distance.toFixed(1) + " NM";
+  $("routeTime").textContent =
+    speed > 0 ? Math.round(distance / speed * 60) + " min" : "—";
+
+  updateMapRoute();
+}
+
+$("planningSpeed").addEventListener("input", renderRoute);
+
+const map = L.map("map").setView([39, -98], 4);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 18,
+  attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+
+let routeLine = null;
+let routeMarkers = [];
+
+function updateMapRoute() {
+  if (routeLine) map.removeLayer(routeLine);
+  routeMarkers.forEach(marker => map.removeLayer(marker));
+  routeMarkers = [];
+
+  if (!state.waypoints.length) return;
+
+  const points = state.waypoints.map(w => [w.lat, w.lon]);
+
+  routeLine = L.polyline(points, {
+    color: "#65c8ff",
+    weight: 3
+  }).addTo(map);
+
+  state.waypoints.forEach((w, i) => {
+    const marker = L.marker([w.lat, w.lon]).addTo(map);
+    marker.bindPopup(
+      `<b>${i + 1}. ${escapeHTML(w.id)}</b><br>${escapeHTML(w.name)}`
+    );
+    routeMarkers.push(marker);
+  });
+}
+
+$("clearRoute").addEventListener("click", () => {
+  if (!confirm("Remove all route waypoints?")) return;
+  state.waypoints = [];
+  renderRoute();
+  saveLocal();
+});
+
+$("fitRoute").addEventListener("click", () => {
+  if (!state.waypoints.length) return;
+  if (state.waypoints.length === 1) {
+    map.setView([state.waypoints[0].lat, state.waypoints[0].lon], 8);
+  } else {
+    map.fitBounds(state.waypoints.map(w => [w.lat, w.lon]), {
+      padding: [25, 25]
+    });
+  }
+});
+
+function stationCode(value) {
+  return value.trim().toUpperCase();
+}
+
+async function getStationProduct(product, station) {
+  const url = `${API}/${product}?ids=${encodeURIComponent(station)}&format=json`;
+  return getJson(url);
+}
+
+$("getWeather").addEventListener("click", async () => {
+  const station = stationCode($("weatherStation").value);
+
+  if (!station) {
+    say("weatherStatus", "Enter a station identifier.");
+    return;
+  }
+
+  say("weatherStatus", "Loading METAR and TAF…");
+  $("metarOutput").textContent = "";
+  $("tafOutput").textContent = "";
+
+  const errors = [];
+
+  try {
+    const metar = await getStationProduct("metar", station);
+    $("metarOutput").textContent =
+      listOf(metar).map(x => x.rawOb || x.raw_text || JSON.stringify(x))
+        .join("\n\n") || "No METAR returned.";
+  } catch (e) {
+    errors.push("METAR unavailable: " + e.message);
+    $("metarOutput").textContent = "METAR unavailable.";
+  }
+
+  try {
+    const taf = await getStationProduct("taf", station);
+    $("tafOutput").textContent =
+      listOf(taf).map(x => x.rawTAF || x.raw_text || JSON.stringify(x))
+        .join("\n\n") || "No TAF returned.";
+  } catch (e) {
+    errors.push("TAF unavailable: " + e.message);
+    $("tafOutput").textContent = "TAF unavailable.";
+  }
+
+  say(
+    "weatherStatus",
+    errors.length ? errors.join(" ") : "Weather requests completed. Check report timestamps and validity.",
+    errors.length ? "error" : "good"
+  );
+});
+
+async function loadAreaProduct(product, label) {
+  say("areaWeatherStatus", `Loading ${label}…`);
+  $("areaWeatherResults").replaceChildren();
+
+  try {
+    /*
+     * Area-product response schemas and supported query parameters can differ.
+     * This query is attempted, but a failed request is explicitly reported.
+     */
+    const url = `${API}/${product}?format=json`;
+    const data = await getJson(url);
+    const items = listOf(data);
+
+    if (!items.length) {
+      say("areaWeatherStatus", `No ${label} records returned.`);
+      return;
+    }
+
+    const container = $("areaWeatherResults");
+    items.slice(0, 50).forEach(item => {
+      const div = document.createElement("div");
+      div.className = "result";
+      div.textContent = JSON.stringify(item, null, 2);
+      container.appendChild(div);
+    });
+
+    say(
+      "areaWeatherStatus",
+      `Returned ${items.length} ${label} record(s). Display limited to the first 50.`,
+      "good"
+    );
+  } catch (error) {
+    say(
+      "areaWeatherStatus",
+      `${label} request failed: ${error.message}. Consult the official Aviation Weather Center for current reports.`,
+      "error"
+    );
+  }
+}
+
+$("getPIREPs").addEventListener("click", () =>
+  loadAreaProduct("aircraftreport", "PIREP")
+);
+$("getSIGMETs").addEventListener("click", () =>
+  loadAreaProduct("airsigmet", "SIGMET")
+);
+$("getGairmets").addEventListener("click", () =>
+  loadAreaProduct("gairmet", "G-AIRMET")
+);
+
+const radarMap = L.map("radarMap").setView([39, -98], 4);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 18,
+  attribution: "&copy; OpenStreetMap contributors"
+}).addTo(radarMap);
+
+async function loadRadar() {
+  say("radarStatus", "Checking radar availability…");
+
+  try {
+    const data = await getJson(
+      "https://api.rainviewer.com/public/weather-maps.json"
+    );
+
+    const host = data.host || "https://tilecache.rainviewer.com";
+    const frames = data.radar && data.radar.past ? data.radar.past : [];
+
+    if (!frames.length) {
+      say("radarStatus", "No past radar frames are currently available.");
+      return;
+    }
+
+    const frame = frames[frames.length - 1];
+
+    if (state.radarLayer) {
+      radarMap.removeLayer(state.radarLayer);
+    }
+
+    state.radarLayer = L.tileLayer(
+      `${host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`,
+      {
+        opacity: 0.65,
+        maxZoom: 7,
+        attribution: "Radar tiles: RainViewer"
+      }
+    );
+
+    if (state.radarEnabled) state.radarLayer.addTo(radarMap);
+
+    say(
+      "radarStatus",
+      "Radar layer requested. Coverage, timestamp, and tile availability may vary."
+    );
+  } catch (error) {
+    say(
+      "radarStatus",
+      "Radar unavailable right now. Check the RainViewer service or use official weather sources.",
+      "error"
+    );
+  }
+}
+
+$("loadRadar").addEventListener("click", loadRadar);
+$("toggleRadar").addEventListener("click", () => {
+  state.radarEnabled = !state.radarEnabled;
+  if (!state.radarLayer) {
+    loadRadar();
+    return;
+  }
+  if (state.radarEnabled) state.radarLayer.addTo(radarMap);
+  else radarMap.removeLayer(state.radarLayer);
+});
+
+function renderTimeline() {
+  const container = $("timelineList");
+  container.replaceChildren();
+
+  state.timeline.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.className = "timeline-item";
+    div.innerHTML = `
+      <strong>${escapeHTML(item.time || "No time")}</strong>
+      <div>${escapeHTML(item.event)}</div>
+      <button class="danger no-print">Remove</button>
+    `;
+    div.querySelector("button").addEventListener("click", () => {
+      state.timeline.splice(i, 1);
+      renderTimeline();
+      saveLocal();
+    });
+    container.appendChild(div);
+  });
+}
+
+$("addTimeline").addEventListener("click", () => {
+  const time = $("timelineTime").value;
+  const event = $("timelineEvent").value.trim();
+  if (!event) {
+    alert("Enter a timeline event.");
+    return;
+  }
+  state.timeline.push({ time, event });
+  state.timeline.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  $("timelineEvent").value = "";
+  renderTimeline();
+  saveLocal();
+});
+
+function renderComms() {
+  const container = $("commList");
+  container.replaceChildren();
+
+  state.comms.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.className = "timeline-item";
+    div.innerHTML = `
+      <strong>${escapeHTML(item.name)}</strong>
+      <div>Frequency / channel: ${escapeHTML(item.freq)}</div>
+      <div>${escapeHTML(item.notes)}</div>
+      <button class="danger no-print">Remove</button>
+    `;
+    div.querySelector("button").addEventListener("click", () => {
+      state.comms.splice(i, 1);
+      renderComms();
+      saveLocal();
+    });
+    container.appendChild(div);
+  });
+}
+
+$("addComm").addEventListener("click", () => {
+  const name = $("commName").value.trim();
+  const freq = $("commFreq").value.trim();
+  const notes = $("commNotes").value.trim();
+
+  if (!name && !freq && !notes) {
+    alert("Enter a communications entry.");
+    return;
+  }
+
+  state.comms.push({ name, freq, notes });
+  $("commName").value = "";
+  $("commFreq").value = "";
+  $("commNotes").value = "";
+  renderComms();
+  saveLocal();
+});
+
+function collectMission() {
+  return {
+    version: 2,
+    updatedAt: new Date().toISOString(),
+    overview: {
+      missionName: $("missionName").value,
+      missionDate: $("missionDate").value,
+      callsign: $("callsign").value,
+      aircraft: $("aircraft").value,
+      departure: $("departure").value,
+      destination: $("destination").value,
+      crew: $("crew").value,
+      planningSpeed: $("planningSpeed").value,
+      missionNotes: $("missionNotes").value
+    },
+    waypoints: state.waypoints,
+    timeline: state.timeline,
+    comms: state.comms
+  };
+}
+
+function applyMission(data) {
+  const overview = data.overview || {};
+
+  const fields = [
+    "missionName","missionDate","callsign","aircraft",
+    "departure","destination","crew","planningSpeed","missionNotes"
+  ];
+
+  fields.forEach(key => {
+    if ($(key) && overview[key] !== undefined) {
+      $(key).value = overview[key];
+    }
+  });
+
+  state.waypoints = Array.isArray(data.waypoints)
+    ? data.waypoints.filter(validCoordinates)
+    : [];
+
+  state.timeline = Array.isArray(data.timeline) ? data.timeline : [];
+  state.comms = Array.isArray(data.comms) ? data.comms : [];
+
+  renderRoute();
+  renderTimeline();
+  renderComms();
+}
+
+function saveLocal() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectMission()));
+    say("saveStatus", "Mission saved on this device.", "good");
+  } catch (error) {
+    say("saveStatus", "Could not save mission locally: " + error.message, "error");
+  }
+}
+
+$("saveMission").addEventListener("click", saveLocal);
+
+$("exportMission").addEventListener("click", () => {
+  const data = collectMission();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "c130-mission-" +
+    (data.overview.missionName || "brief").replace(/[^a-z0-9_-]/gi, "_") +
+    ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+$("importButton").addEventListener("click", () => $("importFile").click());
+
+$("importFile").addEventListener("change", async event => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (!data || typeof data !== "object") {
+      throw new Error("Invalid mission file.");
+    }
+
+    applyMission(data);
+    saveLocal();
+    say("saveStatus", "Mission imported successfully.", "good");
+  } catch (error) {
+    alert("Could not import mission: " + error.message);
+  }
+
+  event.target.value = "";
+});
+
+function buildBriefHTML() {
+  const data = collectMission();
+  const o = data.overview;
+  const esc = escapeHTML;
+
+  const waypoints = data.waypoints.map((w, i) =>
+    `<tr><td>${i + 1}</td><td>${esc(w.id)}</td><td>${esc(w.name)}</td>
+    <td>${w.lat.toFixed(5)}, ${w.lon.toFixed(5)}</td>
+    <td>${esc(w.type)}</td></tr>`
+  ).join("");
+
+  const timeline = data.timeline.map(t =>
+    `<li><b>${esc(t.time)}</b> ${esc(t.event)}</li>`
+  ).join("");
+
+  const comms = data.comms.map(c =>
+    `<li><b>${esc(c.name)}</b> — ${esc(c.freq)}<br>${esc(c.notes)}</li>`
+  ).join("");
+
+  return `
+    <h2>${esc(o.missionName || "Mission Briefing")}</h2>
+    <p><b>Date:</b> ${esc(o.missionDate)} |
+       <b>Callsign:</b> ${esc(o.callsign)} |
+       <b>Aircraft:</b> ${esc(o.aircraft)}</p>
+    <p><b>Departure:</b> ${esc(o.departure)} |
+       <b>Destination:</b> ${esc(o.destination)}</p>
+    <p><b>Crew:</b> ${esc(o.crew)}</p>
+    <p><b>Planning speed:</b> ${esc(o.planningSpeed)} kt</p>
+    <p><b>Notes:</b><br>${esc(o.missionNotes).replace(/\n/g,"<br>")}</p>
+    <h3>Route</h3>
+    <p>Estimated straight-line distance: ${routeDistanceNM().toFixed(1)} NM</p>
+    <table border="1" cellpadding="5" cellspacing="0" style="width:100%;border-collapse:collapse">
+      <thead><tr><th>#</th><th>ID</th><th>Name</th><th>Coordinates</th><th>Type</th></tr></thead>
+      <tbody>${waypoints || "<tr><td colspan='5'>No waypoints</td></tr>"}</tbody>
+    </table>
+    <h3>Timeline</h3><ul>${timeline || "<li>No timeline events</li>"}</ul>
+    <h3>Communications / Coordination</h3><ul>${comms || "<li>No entries</li>"}</ul>
+    <hr>
+    <p><b>Planning aid only:</b> Independently verify all information using current
+    official aeronautical publications, weather products, NOTAMs, aircraft
+    manuals, performance calculations, and approved procedures.</p>
+  `;
+}
+
+$("previewBrief").addEventListener("click", () => {
+  $("briefPreview").innerHTML = buildBriefHTML();
+  $("briefPreview").scrollIntoView({ behavior:"smooth", block:"start" });
+});
+
+$("printBrief").addEventListener("click", () => {
+  $("briefPreview").innerHTML = buildBriefHTML();
+  window.print();
+});
+
+function restoreLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+
+    const data = JSON.parse(raw);
+    applyMission(data);
+    say("saveStatus", "Restored the locally saved mission.", "good");
+  } catch (error) {
+    console.warn("Could not restore saved mission:", error);
+    say("saveStatus", "Could not restore the saved mission.");
+  }
+}
+
+(function initialize() {
+  const today = new Date();
+  const localDate = new Date(
+    today.getTime() - today.getTimezoneOffset() * 60000
+  ).toISOString().slice(0,10);
+
+  $("missionDate").value = localDate;
+  restoreLocal();
+
+  // Initial radar request is best-effort and does not block the planner.
+  loadRadar();
+})();
+</script>
+</body>
+</html>
